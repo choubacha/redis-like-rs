@@ -1,36 +1,37 @@
+extern crate bytes;
+#[macro_use]
 extern crate futures;
 extern crate tokio;
+#[macro_use]
 extern crate tokio_io;
 
 use futures::{Future, Stream};
 use tokio::executor::current_thread;
 use tokio::net::TcpListener;
-use tokio_io::{io, AsyncRead};
+
 
 use std::thread;
-use std::sync::mpsc::channel;
+use std::collections::HashMap;
+use bytes::{BytesMut, Bytes, BufMut};
+
+mod command;
+use command::{Command, CommandStream};
+mod connection;
+use connection::Connection;
 
 fn main() {
     let addr = "0.0.0.0:9000".parse().unwrap();
     let tcp = TcpListener::bind(&addr).unwrap();
 
-    let (tx, rx) = channel::<Option<String>>();
-
-    let db = thread::spawn(move || {
-        while let Ok(Some(msg)) = rx.recv() {
-            println!("Got a message: {}", msg);
-        }
-    });
+    // every connection needs a channel to listen for results. when a command
+    // comes in, it queues the command with the receiver and then waits for
+    // a response
 
     let server = tcp.incoming().for_each(|cxn| {
-        let (reader, writer) = cxn.split();
-
-        let conn = io::read_to_end(reader, Vec::new())
-            .map(|buf| println!("buf: {:?}", buf))
-            .map_err(|err| println!("IO error: {:?}", err));
-
+        let conn = Connection::new(cxn)
+            .map(|_| println!("woot"))
+            .map_err(|_| println!("err"));
         current_thread::spawn(conn);
-
         Ok(())
     })
     .map_err(|err| println!("server error: {:?}", err));
