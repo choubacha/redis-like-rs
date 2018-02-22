@@ -1,4 +1,4 @@
-use futures::{Async, Future, Stream, Poll};
+use futures::{Async, Future, Poll, Stream};
 use tokio_io::io::WriteHalf;
 use tokio_io::AsyncRead;
 use tokio::net::TcpStream;
@@ -6,8 +6,6 @@ use command::{Command, CommandStream};
 use futures::sync::mpsc;
 use std::io;
 use std::io::Write;
-use std::convert::From;
-use bytes::Bytes;
 
 pub struct Connection {
     writer: WriteHalf<TcpStream>,
@@ -21,7 +19,12 @@ impl Connection {
         let (reader, writer) = socket.split();
         let commands = CommandStream::new(reader);
         let (tx, rx) = mpsc::channel(1024);
-        Connection { tx, rx, commands, writer }
+        Connection {
+            tx,
+            rx,
+            commands,
+            writer,
+        }
     }
 }
 
@@ -42,22 +45,16 @@ impl Future for Connection {
             }
 
             match command {
-                Ok(Command::Get(key)) => {
-                    match String::from_utf8(key.to_vec()) {
-                        Ok(key) => write_out!(format!("GET {}\n", key).as_bytes()),
-                        Err(_) => write_out!(b"Non-utf8 key"),
-                    }
+                Ok(Command::Get(key)) => match String::from_utf8(key.to_vec()) {
+                    Ok(key) => write_out!(format!("GET {}\n", key).as_bytes()),
+                    Err(_) => write_out!(b"Non-utf8 key"),
                 },
-                Ok(Command::Set(key, value)) => {
-                    match String::from_utf8(key.to_vec()) {
-                        Ok(key) => {
-                            match String::from_utf8(value.to_vec()) {
-                                Ok(value) => write_out!(format!("SET {} = {}\n", key, value).as_bytes()),
-                                Err(_) => write_out!(b"Non-utf8 value"),
-                            }
-                        },
-                        Err(_) => write_out!(b"Non-utf8 key"),
-                    }
+                Ok(Command::Set(key, value)) => match String::from_utf8(key.to_vec()) {
+                    Ok(key) => match String::from_utf8(value.to_vec()) {
+                        Ok(value) => write_out!(format!("SET {} = {}\n", key, value).as_bytes()),
+                        Err(_) => write_out!(b"Non-utf8 value"),
+                    },
+                    Err(_) => write_out!(b"Non-utf8 key"),
                 },
                 Err(err) => write_out!(format!("ERR {:?}\n", err).as_bytes()),
             }

@@ -1,8 +1,8 @@
-use bytes::{BytesMut, Bytes, BufMut};
+use bytes::{Bytes, BytesMut};
 use tokio_io::io::ReadHalf;
 use tokio_io::AsyncRead;
 use tokio::net::TcpStream;
-use futures::{Async, Future, Stream, Poll};
+use futures::{Async, Poll, Stream};
 use std::io;
 
 #[derive(Debug, PartialEq)]
@@ -27,7 +27,7 @@ impl Command {
                     } else {
                         Ok(Command::Get(bytes))
                     }
-                },
+                }
                 b"set" => {
                     if let Some(first_space_index) = bytes.iter().position(|b| b == &b' ') {
                         let key = bytes.split_to(first_space_index);
@@ -42,8 +42,8 @@ impl Command {
                     } else {
                         Err(ErrorKind::KeyNotFound)
                     }
-                },
-                _ => Err(ErrorKind::CommandNotFound)
+                }
+                _ => Err(ErrorKind::CommandNotFound),
             }
         } else {
             Err(ErrorKind::CommandNotFound)
@@ -79,7 +79,8 @@ impl CommandStream {
             // Read data into the buffer.
             let n = try_ready!(self.read_socket.read_buf(&mut self.rd));
 
-            if n == 0 { // Nothing read, socket closed
+            if n == 0 {
+                // Nothing read, socket closed
                 return Ok(Async::Ready(()));
             }
         }
@@ -132,7 +133,10 @@ mod tests {
         let bytes = Bytes::from(&b"set hello world yessss"[..]);
         assert_eq!(
             Command::from(bytes),
-            Ok(Command::Set(Bytes::from(&b"hello"[..]), Bytes::from(&b"world yessss"[..])))
+            Ok(Command::Set(
+                Bytes::from(&b"hello"[..]),
+                Bytes::from(&b"world yessss"[..])
+            ))
         );
     }
 

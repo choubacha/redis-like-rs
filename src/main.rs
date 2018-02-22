@@ -9,13 +9,7 @@ use futures::{Future, Stream};
 use tokio::executor::current_thread;
 use tokio::net::TcpListener;
 
-
-use std::thread;
-use std::collections::HashMap;
-use bytes::{BytesMut, Bytes, BufMut};
-
 mod command;
-use command::{Command, CommandStream};
 mod connection;
 use connection::Connection;
 
@@ -27,14 +21,15 @@ fn main() {
     // comes in, it queues the command with the receiver and then waits for
     // a response
 
-    let server = tcp.incoming().for_each(|cxn| {
-        let conn = Connection::new(cxn)
-            .map(|_| println!("woot"))
-            .map_err(|_| println!("err"));
-        current_thread::spawn(conn);
-        Ok(())
-    })
-    .map_err(|err| println!("server error: {:?}", err));
+    let server = tcp.incoming()
+        .for_each(|cxn| {
+            let conn = Connection::new(cxn)
+                .map(|_| println!("woot"))
+                .map_err(|_| println!("err"));
+            current_thread::spawn(conn);
+            Ok(())
+        })
+        .map_err(|err| println!("server error: {:?}", err));
 
     current_thread::run(|_| {
         current_thread::spawn(server);
