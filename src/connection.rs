@@ -37,16 +37,18 @@ impl Future for Connection {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
         macro_rules! write_out {
-            ($e:expr) => ({ let _ = try_nb!(self.writer.write($e)); })
+            ($e:expr) => ({
+                let _ = try_nb!(self.writer.write($e));
+            })
         }
 
         if let Async::Ready(Some(result)) = self.db_result_receiver.poll().unwrap() {
             match result {
                 DbResult::Written => write_out!(b"1\n"),
                 DbResult::NotFound => write_out!(b"\n"),
-                DbResult::Found(bytes) => {
+                DbResult::Found(mut bytes) => {
+                    bytes.extend_from_slice(b"\n");
                     write_out!(&bytes);
-                    write_out!(b"\n");
                 }
                 DbResult::NotWritten => write_out!(b"0\n"),
             }
@@ -56,7 +58,7 @@ impl Future for Connection {
             match command {
                 Some(Ok(cmd)) => {
                     let txn = Transaction::new(cmd, self.db_result_sender.clone());
-                    self.db_channel.unbounded_send(txn.clone()).unwrap();
+                    self.db_channel.unbounded_send(txn).unwrap();
                 }
                 Some(Err(err)) => write_out!(format!("ERR {:?}\n", err).as_bytes()),
                 None => return Ok(Async::Ready(())),

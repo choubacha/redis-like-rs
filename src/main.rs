@@ -35,7 +35,7 @@ fn main() {
             let tx = tx.clone();
             let conn = Connection::new(cxn, tx)
                 .map(|_| println!("closed!"))
-                .map_err(|_| println!("err"));
+                .map_err(|e| println!("err: {:?}", e));
             println!("new connection!");
             current_thread::spawn(conn);
             Ok(())

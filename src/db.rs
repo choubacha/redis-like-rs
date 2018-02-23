@@ -4,6 +4,14 @@ use futures::{Async, Future, Poll, Stream};
 use std::collections::HashMap;
 use bytes::Bytes;
 
+#[derive(Debug)]
+pub enum DbResult {
+    Written,
+    #[allow(dead_code)] NotWritten,
+    Found(Bytes),
+    NotFound,
+}
+
 #[derive(Clone)]
 pub struct Transaction {
     command: Command,
@@ -63,11 +71,4 @@ impl Future for Db {
         }
         Ok(Async::NotReady)
     }
-}
-
-pub enum DbResult {
-    Written,
-    #[allow(dead_code)] NotWritten,
-    Found(Bytes),
-    NotFound,
 }
