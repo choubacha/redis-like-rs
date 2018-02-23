@@ -24,8 +24,9 @@ fn main() {
     let server = tcp.incoming()
         .for_each(|cxn| {
             let conn = Connection::new(cxn)
-                .map(|_| println!("woot"))
+                .map(|_| println!("closed!"))
                 .map_err(|_| println!("err"));
+            println!("new connection!");
             current_thread::spawn(conn);
             Ok(())
         })

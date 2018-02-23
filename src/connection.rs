@@ -33,31 +33,26 @@ impl Future for Connection {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(), io::Error> {
-        while let Async::Ready(Some(command)) = self.commands.poll()? {
-            println!("command received: {:?}", command);
+        macro_rules! write_out {
+            ($e:expr) => ({ let _ = try_nb!(self.writer.write($e)); })
+        }
 
-            macro_rules! write_out {
-                ($e:expr) => (
-                    {
-                        let _ = try_nb!(self.writer.write($e));
-                    }
-                )
-            }
-
+        while let Async::Ready(command) = self.commands.poll()? {
             match command {
-                Ok(Command::Get(key)) => match String::from_utf8(key.to_vec()) {
+                Some(Ok(Command::Get(key))) => match String::from_utf8(key.to_vec()) {
                     Ok(key) => write_out!(format!("GET {}\n", key).as_bytes()),
                     Err(_) => write_out!(b"Non-utf8 key"),
                 },
-                Ok(Command::Set(key, value)) => match String::from_utf8(key.to_vec()) {
+                Some(Ok(Command::Set(key, value))) => match String::from_utf8(key.to_vec()) {
                     Ok(key) => match String::from_utf8(value.to_vec()) {
                         Ok(value) => write_out!(format!("SET {} = {}\n", key, value).as_bytes()),
                         Err(_) => write_out!(b"Non-utf8 value"),
                     },
                     Err(_) => write_out!(b"Non-utf8 key"),
                 },
-                Err(err) => write_out!(format!("ERR {:?}\n", err).as_bytes()),
-            }
+                Some(Err(err)) => write_out!(format!("ERR {:?}\n", err).as_bytes()),
+                None => return Ok(Async::Ready(())),
+            };
         }
         Ok(Async::NotReady)
     }
