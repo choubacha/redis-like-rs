@@ -13,11 +13,18 @@ Then you can telnet or netcat in and try the two commands:
 ```
 $ nc localhost 9000
 get hello
-GET hello
+
 set hello world
-SET hello = world
-laksjdf
+1
+get hello
+world
+set hello world_2
+1
+get hello
+world_2
+kdjf
 ERR CommandNotFound
+
 ```
 
 The structure of the commands is simple, they must be lower case, they must have their
@@ -27,10 +34,10 @@ params separated by a single space, and the command is delimited by a new line.
 
 [x] Accept connections
 [x] Parse commands
-[ ] Put commands into a tranaction
-[ ] Send transaction to a "db"
-[ ] Listen for results
-[ ] Write results back to connection
+[x] Put commands into a tranaction
+[x] Send transaction to a "db"
+[x] Listen for results
+[x] Write results back to connection
 
 ### Structure
 
