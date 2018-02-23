@@ -97,14 +97,10 @@ impl Stream for CommandStream {
 
         // Now, try finding lines
 
-        if let Some(pos) = self.rd.iter().position(|b| *b == b'\n') {
-            // Remove the line from the read buffer and set it to `line`.
+        if let Some(mut pos) = self.rd.iter().position(|b| *b == b'\n') {
             let mut line = self.rd.split_to(pos + 1);
-
-            // Drop the trailing \r\n
-            line.split_off(pos);
-
-            // Return the line
+            if line.ends_with(b"\r\n") { pos -= 1 }
+            line.truncate(pos);
             return Ok(Async::Ready(Some(Command::from(line.freeze()))));
         }
 
