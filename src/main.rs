@@ -8,9 +8,11 @@ extern crate tokio_io;
 use futures::{Future, Stream};
 use tokio::executor::current_thread;
 use tokio::net::TcpListener;
+use std::thread;
 
 mod command;
 mod connection;
+mod db;
 use connection::Connection;
 
 fn main() {
@@ -20,10 +22,18 @@ fn main() {
     // every connection needs a channel to listen for results. when a command
     // comes in, it queues the command with the receiver and then waits for
     // a response
+    let (tx, db) = db::Db::new();
+
+    thread::spawn(move || {
+        current_thread::run(|_| {
+            current_thread::spawn(db);
+        });
+    });
 
     let server = tcp.incoming()
-        .for_each(|cxn| {
-            let conn = Connection::new(cxn)
+        .for_each(move |cxn| {
+            let tx = tx.clone();
+            let conn = Connection::new(cxn, tx)
                 .map(|_| println!("closed!"))
                 .map_err(|_| println!("err"));
             println!("new connection!");

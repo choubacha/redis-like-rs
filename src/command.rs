@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 use futures::{Async, Poll, Stream};
 use std::io;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Get(Bytes),
     Set(Bytes, Bytes),

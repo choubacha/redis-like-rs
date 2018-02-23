@@ -1,4 +1,5 @@
 use futures::{Async, Future, Poll, Stream};
+use futures::sink::Sink;
 use tokio_io::io::WriteHalf;
 use tokio_io::AsyncRead;
 use tokio::net::TcpStream;
@@ -6,22 +7,25 @@ use command::{Command, CommandStream};
 use futures::sync::mpsc;
 use std::io;
 use std::io::Write;
+use db::{Transaction, DbResult};
 
 pub struct Connection {
     writer: WriteHalf<TcpStream>,
     commands: CommandStream,
-    tx: mpsc::Sender<Option<usize>>,
-    rx: mpsc::Receiver<Option<usize>>,
+    db_channel: mpsc::UnboundedSender<Transaction>,
+    db_result_sender: mpsc::UnboundedSender<DbResult>,
+    db_result_receiver: mpsc::UnboundedReceiver<DbResult>,
 }
 
 impl Connection {
-    pub fn new(socket: TcpStream) -> Self {
+    pub fn new(socket: TcpStream, db_channel: mpsc::UnboundedSender<Transaction>) -> Self {
         let (reader, writer) = socket.split();
         let commands = CommandStream::new(reader);
-        let (tx, rx) = mpsc::channel(1024);
+        let (db_result_sender, db_result_receiver) = mpsc::unbounded();
         Connection {
-            tx,
-            rx,
+            db_channel,
+            db_result_sender,
+            db_result_receiver,
             commands,
             writer,
         }
@@ -37,18 +41,23 @@ impl Future for Connection {
             ($e:expr) => ({ let _ = try_nb!(self.writer.write($e)); })
         }
 
-        while let Async::Ready(command) = self.commands.poll()? {
-            match command {
-                Some(Ok(Command::Get(key))) => match String::from_utf8(key.to_vec()) {
-                    Ok(key) => write_out!(format!("GET {}\n", key).as_bytes()),
-                    Err(_) => write_out!(b"Non-utf8 key"),
+        if let Async::Ready(Some(result)) = self.db_result_receiver.poll().unwrap() {
+            match result {
+                DbResult::Written => write_out!(b"1\n"),
+                DbResult::NotFound => write_out!(b"\n"),
+                DbResult::Found(bytes) => {
+                    write_out!(&bytes);
+                    write_out!(b"\n");
                 },
-                Some(Ok(Command::Set(key, value))) => match String::from_utf8(key.to_vec()) {
-                    Ok(key) => match String::from_utf8(value.to_vec()) {
-                        Ok(value) => write_out!(format!("SET {} = {}\n", key, value).as_bytes()),
-                        Err(_) => write_out!(b"Non-utf8 value"),
-                    },
-                    Err(_) => write_out!(b"Non-utf8 key"),
+                DbResult::NotWritten => write_out!(b"0\n"),
+            }
+        }
+
+        if let Async::Ready(command) = self.commands.poll()? {
+            match command {
+                Some(Ok(cmd)) => {
+                    let txn = Transaction::new(cmd, self.db_result_sender.clone());
+                    self.db_channel.unbounded_send(txn.clone()).unwrap();
                 },
                 Some(Err(err)) => write_out!(format!("ERR {:?}\n", err).as_bytes()),
                 None => return Ok(Async::Ready(())),
