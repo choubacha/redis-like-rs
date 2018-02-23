@@ -1,13 +1,12 @@
 use futures::{Async, Future, Poll, Stream};
-use futures::sink::Sink;
 use tokio_io::io::WriteHalf;
 use tokio_io::AsyncRead;
 use tokio::net::TcpStream;
-use command::{Command, CommandStream};
+use command::CommandStream;
 use futures::sync::mpsc;
 use std::io;
 use std::io::Write;
-use db::{Transaction, DbResult};
+use db::{DbResult, Transaction};
 
 pub struct Connection {
     writer: WriteHalf<TcpStream>,
@@ -48,7 +47,7 @@ impl Future for Connection {
                 DbResult::Found(bytes) => {
                     write_out!(&bytes);
                     write_out!(b"\n");
-                },
+                }
                 DbResult::NotWritten => write_out!(b"0\n"),
             }
         }
@@ -58,7 +57,7 @@ impl Future for Connection {
                 Some(Ok(cmd)) => {
                     let txn = Transaction::new(cmd, self.db_result_sender.clone());
                     self.db_channel.unbounded_send(txn.clone()).unwrap();
-                },
+                }
                 Some(Err(err)) => write_out!(format!("ERR {:?}\n", err).as_bytes()),
                 None => return Ok(Async::Ready(())),
             };
